@@ -13,10 +13,16 @@ Tamagotchi::Tamagotchi() {
   happyFaceTimer = 0;
   showInsufficientCoins = false;
   insufficientCoinsTimer = 0;
+  playHungrySound = false;
+  playBoredSound = false;
+  playSleepySound = false;
   
   lastMinuteUpdate = 0;
   sleepStartTime = 0;
   lastSleepTick = 0;
+  wasHungry = false;
+  wasBored = false;
+  wasSleepy = false;
 }
 
 void Tamagotchi::initialize() {
@@ -52,6 +58,15 @@ bool Tamagotchi::buyFood(int type) {
   coins -= cost;
   hunger = min(100, hunger + restore);
   sleepiness = max(0, sleepiness - 10); // Reducir sueño 10% al comer
+  
+  // Verificar si sueño llegó a 20 o menos
+  if (sleepiness <= 20 && !wasSleepy) {
+    playSleepySound = true;
+    wasSleepy = true;
+  } else if (sleepiness > 20) {
+    wasSleepy = false;
+  }
+  
   showHappyFace = true;
   happyFaceTimer = millis();
   saveStats();
@@ -119,8 +134,24 @@ void Tamagotchi::updatePerMinute() {
     // Hambre pierde 1% por minuto
     hunger = max(0, hunger - 1);
     
+    // Detectar si hambre llegó a 20 o menos
+    if (hunger <= 20 && !wasHungry) {
+      playHungrySound = true;
+      wasHungry = true;
+    } else if (hunger > 20) {
+      wasHungry = false;
+    }
+    
     // Aburrimiento pierde 1% por minuto
     boredom = max(0, boredom - 1);
+    
+    // Detectar si aburrimiento llegó a 20 o menos
+    if (boredom <= 20 && !wasBored) {
+      playBoredSound = true;
+      wasBored = true;
+    } else if (boredom > 20) {
+      wasBored = false;
+    }
     
     // Sueño pierde 1% cada 2 minutos (contador interno)
     static int sleepCounter = 0;
@@ -128,6 +159,14 @@ void Tamagotchi::updatePerMinute() {
     if (sleepCounter >= 2) {
       sleepiness = max(0, sleepiness - 1);
       sleepCounter = 0;
+    }
+    
+    // Detectar si sueño llegó a 20 o menos
+    if (sleepiness <= 20 && !wasSleepy) {
+      playSleepySound = true;
+      wasSleepy = true;
+    } else if (sleepiness > 20) {
+      wasSleepy = false;
     }
     
     // Si el sueño llegó a 0%, dormir automáticamente
@@ -166,6 +205,14 @@ bool Tamagotchi::feed() {
   // Sueño baja 5%
   sleepiness = max(0, sleepiness - 5);
   
+  // Verificar si sueño llegó a 20 o menos
+  if (sleepiness <= 20 && !wasSleepy) {
+    playSleepySound = true;
+    wasSleepy = true;
+  } else if (sleepiness > 20) {
+    wasSleepy = false;
+  }
+  
   // Mostrar cara feliz
   showHappyFace = true;
   happyFaceTimer = millis();
@@ -183,8 +230,24 @@ bool Tamagotchi::play() {
   // Hambre baja 15%
   hunger = max(0, hunger - 15);
   
+  // Verificar si hambre llegó a 20 o menos
+  if (hunger <= 20 && !wasHungry) {
+    playHungrySound = true;
+    wasHungry = true;
+  } else if (hunger > 20) {
+    wasHungry = false;
+  }
+  
   // Sueño baja 15%
   sleepiness = max(0, sleepiness - 15);
+  
+  // Verificar si sueño llegó a 20 o menos
+  if (sleepiness <= 20 && !wasSleepy) {
+    playSleepySound = true;
+    wasSleepy = true;
+  } else if (sleepiness > 20) {
+    wasSleepy = false;
+  }
   
   // NO mostrar cara feliz al iniciar (se mostrará al terminar el juego)
   
@@ -221,6 +284,14 @@ void Tamagotchi::wakeUp() {
   // Al despertar: mantener sueño actual, aburrimiento +20%, hambre -15%
   boredom = min(100, boredom + 20);
   hunger = max(0, hunger - 15);
+  
+  // Verificar si hambre llegó a 20 o menos
+  if (hunger <= 20 && !wasHungry) {
+    playHungrySound = true;
+    wasHungry = true;
+  } else if (hunger > 20) {
+    wasHungry = false;
+  }
   
   lastMinuteUpdate = millis();
   saveStats();

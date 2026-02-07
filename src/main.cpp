@@ -40,6 +40,8 @@ const unsigned long MENU_TIMEOUT = 5000; // Cerrar menú después de 5 segundos 
 // Declaraciones forward
 void playHappySound();
 void playAngrySound();
+void playBoredSound();
+void playSleepySound();
 void playBeep();
 void startGame();
 void updateGame();
@@ -68,6 +70,28 @@ void playAngrySound() {
   for (int i = 0; i < 2; ++i) {
     tone(BUZZER_PIN, melody[i], noteDuration);
     delay(noteDuration + 10);
+  }
+  noTone(BUZZER_PIN);
+}
+
+// Sonido aburrido: tres notas monótonas y bajas
+void playBoredSound() {
+  int melody[] = {600, 600, 600};
+  int noteDuration = 150;
+  for (int i = 0; i < 3; ++i) {
+    tone(BUZZER_PIN, melody[i], noteDuration);
+    delay(noteDuration + 30);
+  }
+  noTone(BUZZER_PIN);
+}
+
+// Sonido de sueño: dos notas descendentes suaves y lentas
+void playSleepySound() {
+  int melody[] = {800, 400};
+  int noteDuration = 200;
+  for (int i = 0; i < 2; ++i) {
+    tone(BUZZER_PIN, melody[i], noteDuration);
+    delay(noteDuration + 50);
   }
   noTone(BUZZER_PIN);
 }
@@ -223,6 +247,20 @@ void loop() {
       btnRightPressStart = 0;
       btnRightProcessed = false;
     }
+  }
+  
+  // Reproducir sonidos de estado bajo (hambre, aburrimiento, sueño)
+  if (pet.playHungrySound) {
+    playAngrySound();
+    pet.playHungrySound = false;
+  }
+  if (pet.playBoredSound) {
+    playBoredSound();
+    pet.playBoredSound = false;
+  }
+  if (pet.playSleepySound) {
+    playSleepySound();
+    pet.playSleepySound = false;
   }
   
   // Mostrar animación ANGRY o HAPPY si corresponde (superpone todo y bloquea botones)

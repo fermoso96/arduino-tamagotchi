@@ -22,6 +22,11 @@ private:
   Preferences prefs;
   unsigned long lastSleepTick; // Para controlar incremento de sueño cada 5 segundos
   
+  // Variables para rastrear cuándo se activan los sonidos
+  bool wasHungry;   // Si el hambre ya estaba <= 20
+  bool wasBored;    // Si el aburrimiento ya estaba <= 20
+  bool wasSleepy;   // Si el sueño ya estaba <= 20
+  
 public:
   bool isSleeping;
   bool showAngryFace;  // Para feedback visual
@@ -30,6 +35,9 @@ public:
   unsigned long happyFaceTimer;
   bool showInsufficientCoins;  // Mensaje de monedas insuficientes
   unsigned long insufficientCoinsTimer;
+  bool playHungrySound;    // Señal para reproducir sonido de hambre
+  bool playBoredSound;     // Señal para reproducir sonido de aburrimiento
+  bool playSleepySound;    // Señal para reproducir sonido de sueño
   
   Tamagotchi();
   void initialize();
