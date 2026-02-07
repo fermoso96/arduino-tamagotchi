@@ -12,7 +12,7 @@ void DisplayManager::showShopMenuScreen(int shopMenuOption, bool memGameUnlocked
   display->drawLine(0, 10, 127, 10, SSD1306_WHITE);
 
   // Artículos de la tienda
-  const char* labels[5] = {"Manzana (10c/+25H)", "Pan (15c/+50H)", "Queso (20c/+75H)", "Tarta (25c/+100H)", "Juego Memoria (50c)"};
+  const char* labels[5] = {"Manzana (10c/+25H)", "Pan (15c/+50H)", "Queso (20c/+75H)", "Tarta (25c/+100H)", "Juego Memoria (100c)"};
   int totalItems = memGameUnlocked ? 4 : 5;
   int y = 18;
   int itemHeight = 10;
@@ -128,7 +128,7 @@ void DisplayManager::drawMenu(int selectedOption) {
   }
 }
 
-void DisplayManager::showMenuScreen(int selectedOption) {
+void DisplayManager::showMenuScreen(int selectedOption, bool soundEnabled) {
   display->clearDisplay();
   
   // Mostrar estadísticas arriba
@@ -152,14 +152,13 @@ void DisplayManager::showMenuScreen(int selectedOption) {
   // Línea divisoria
   display->drawLine(0, 10, 127, 10, SSD1306_WHITE);
   
-  // Dibujar el menú con las 3 opciones
-  int y = 20;
-  int itemHeight = 15;
+  // Dibujar el menú con las 4 opciones
+  int y = 15;
+  int itemHeight = 12;
   
-  // Opción TIENDA fija
-  const char* labels[] = {"TIENDA", "JUGAR", "DORMIR"};
+  const char* labels[] = {"TIENDA", "JUGAR", "DORMIR", ""};
   
-  for(int i = 0; i < 3; i++) {
+  for(int i = 0; i < 4; i++) {
     if(i == selectedOption) {
       display->fillRect(0, y + (i * itemHeight), 128, itemHeight, SSD1306_WHITE);
       display->setTextColor(SSD1306_BLACK);
@@ -167,9 +166,16 @@ void DisplayManager::showMenuScreen(int selectedOption) {
       display->setTextColor(SSD1306_WHITE);
     }
     
-    display->setCursor(10, y + (i * itemHeight) + 3);
+    display->setCursor(10, y + (i * itemHeight) + 2);
     display->setTextSize(1);
-    display->print(labels[i]);
+    
+    if (i == 3) {
+      // Opción SOUND con estado
+      display->print("SOUND: ");
+      display->print(soundEnabled ? "ON" : "OFF");
+    } else {
+      display->print(labels[i]);
+    }
   }
   
   display->display();

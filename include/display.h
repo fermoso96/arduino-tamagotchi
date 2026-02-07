@@ -22,7 +22,7 @@ public:
   void showMainScreen();
   void showSleepScreen();
   void showInsufficientCoinsScreen();
-  void showMenuScreen(int menuOption);
+  void showMenuScreen(int menuOption, bool soundEnabled);
   void showShopMenuScreen(int shopMenuOption, bool memGameUnlocked);
   void showGameMenuScreen(int gameMenuOption);
   void showGameScreen(DodgeGame* game);

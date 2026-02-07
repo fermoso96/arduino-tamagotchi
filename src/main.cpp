@@ -2,15 +2,14 @@
 #include <Wire.h>
 #include <Adafruit_SSD1306.h>
 #include <Adafruit_GFX.h>
+#include <Preferences.h>
 #include "tamagotchi.h"
 #include "game.h"
 #include "memorygame.h"
 #include "display.h"
 
 // Configuración de pines
-#define BTN_LEFT 0
 #define BTN_ENTER 1
-#define BTN_RIGHT 2
 #define BUZZER_PIN 5
 #define I2C_SDA 8
 #define I2C_SCL 9
@@ -31,11 +30,13 @@ bool inMemoryGame = false;
 bool showMenu = false;
 bool showGameMenu = false; // Submenú de juegos
 bool showShopMenu = false; // Submenú de tienda
-bool testMode = true; // Modo TEST activado/desactivado
-int menuOption = 0; // 0: TIENDA, 1: JUGAR, 2: DORMIR
+bool soundEnabled = true; // Control de sonido (ON/OFF)
+int menuOption = 0; // 0: TIENDA, 1: JUGAR, 2: DORMIR, 3: SOUND
 int gameMenuOption = 0; // 0: ESQUIVAR, 1: MEMORIA
 int shopMenuOption = 0; // 0: Manzana, 1: Pan, 2: Queso, 3: Tarta, 4: Juego de memoria
 const unsigned long MENU_TIMEOUT = 5000; // Cerrar menú después de 5 segundos sin actividad
+const unsigned long LONG_PRESS_TIME = 500; // 500ms para considerar pulsación larga
+Preferences soundPrefs; // Para guardar estado del sonido
 
 // Declaraciones forward
 void playHappySound();
@@ -54,6 +55,7 @@ void playSound(int frequency, int duration);
 
 // Sonido feliz: melodía ascendente
 void playHappySound() {
+  if (!soundEnabled) return;
   int melody[] = {2500, 3000, 3500, 4000};
   int noteDuration = 80;
   for (int i = 0; i < 4; ++i) {
@@ -65,6 +67,7 @@ void playHappySound() {
 
 // Sonido enfadado: dos notas graves descendentes
 void playAngrySound() {
+  if (!soundEnabled) return;
   int melody[] = {1200, 900};
   int noteDuration = 120;
   for (int i = 0; i < 2; ++i) {
@@ -76,6 +79,7 @@ void playAngrySound() {
 
 // Sonido aburrido: tres notas monótonas y bajas
 void playBoredSound() {
+  if (!soundEnabled) return;
   int melody[] = {600, 600, 600};
   int noteDuration = 150;
   for (int i = 0; i < 3; ++i) {
@@ -87,6 +91,7 @@ void playBoredSound() {
 
 // Sonido de sueño: dos notas descendentes suaves y lentas
 void playSleepySound() {
+  if (!soundEnabled) return;
   int melody[] = {800, 400};
   int noteDuration = 200;
   for (int i = 0; i < 2; ++i) {
@@ -99,6 +104,7 @@ void playSleepySound() {
 void playSound(int frequency, int duration);
 
 void playSound(int frequency, int duration) {
+  if (!soundEnabled) return;
   int testDuration = duration;
   if (testDuration < 100) testDuration = 100;
   tone(BUZZER_PIN, frequency, testDuration);
@@ -108,6 +114,7 @@ void playSound(int frequency, int duration) {
 
 // Bip simple para botón
 void playBeep() {
+  if (!soundEnabled) return;
   tone(BUZZER_PIN, 3000, 60);
   delay(70);
   noTone(BUZZER_PIN);
@@ -122,10 +129,8 @@ void setup() {
   }
   delay(200);
   log_i("=== TAMAGOTCHI START ===");
-  // Inicializar pines de botones (Solo 3 botones)
-  pinMode(BTN_LEFT, INPUT_PULLUP);
+  // Inicializar pin del botón central
   pinMode(BTN_ENTER, INPUT_PULLUP);
-  pinMode(BTN_RIGHT, INPUT_PULLUP);
   
   // Inicializar buzzer
   pinMode(BUZZER_PIN, OUTPUT);
@@ -158,6 +163,10 @@ void setup() {
   // Inicializar display manager
   displayMgr.initialize(&display, &pet);
   
+  // Cargar configuración de sonido
+  soundPrefs.begin("sound", false);
+  soundEnabled = soundPrefs.getBool("enabled", true); // Por defecto ON
+  
   log_i("Tamagotchi initialized successfully!");
 }
 
@@ -169,84 +178,6 @@ void loop() {
   if (currentTime - lastUpdateTime >= 500) {
     lastUpdateTime = currentTime;
     pet.update();
-  }
-  
-  // === ACTIVAR/DESACTIVAR MODO TEST ===
-  // Mantener los 3 botones presionados durante 3 segundos
-  static unsigned long allBtnPressStart = 0;
-  static bool allBtnProcessed = false;
-  
-  if (digitalRead(BTN_LEFT) == LOW && digitalRead(BTN_ENTER) == LOW && digitalRead(BTN_RIGHT) == LOW) {
-    if (allBtnPressStart == 0) {
-      allBtnPressStart = millis();
-    } else if (!allBtnProcessed && (millis() - allBtnPressStart >= 3000)) {
-      testMode = !testMode; // Alternar modo TEST
-      // Pitido de confirmación: 2 tonos si se activa, 1 tono si se desactiva
-      if (testMode) {
-        playBeep();
-        delay(100);
-        playBeep();
-      } else {
-        playBeep();
-      }
-      allBtnProcessed = true;
-    }
-  } else {
-    allBtnPressStart = 0;
-    allBtnProcessed = false;
-  }
-  
-  // === MODO TEST: Mantener botones 2 segundos para restaurar stats ===
-  // Solo funciona en pantalla principal (no en menús, juegos, etc.) y si testMode está activado
-  if (testMode && !showMenu && !showShopMenu && !showGameMenu && !inGame && !inMemoryGame && !pet.isSleeping) {
-    static unsigned long btnLeftPressStart = 0;
-    static unsigned long btnEnterPressStart = 0;
-    static unsigned long btnRightPressStart = 0;
-    static bool btnLeftProcessed = false;
-    static bool btnEnterProcessed = false;
-    static bool btnRightProcessed = false;
-    
-    // Botón IZQUIERDO - Restaurar hambre al 100%
-    if (digitalRead(BTN_LEFT) == LOW && digitalRead(BTN_ENTER) == HIGH && digitalRead(BTN_RIGHT) == HIGH) {
-      if (btnLeftPressStart == 0) {
-        btnLeftPressStart = millis();
-      } else if (!btnLeftProcessed && (millis() - btnLeftPressStart >= 2000)) {
-        playBeep();
-        pet.setHunger(100);
-        btnLeftProcessed = true;
-      }
-    } else {
-      btnLeftPressStart = 0;
-      btnLeftProcessed = false;
-    }
-    
-    // Botón CENTRO - Restaurar aburrimiento al 100%
-    if (digitalRead(BTN_ENTER) == LOW && digitalRead(BTN_LEFT) == HIGH && digitalRead(BTN_RIGHT) == HIGH) {
-      if (btnEnterPressStart == 0) {
-        btnEnterPressStart = millis();
-      } else if (!btnEnterProcessed && (millis() - btnEnterPressStart >= 2000)) {
-        playBeep();
-        pet.setBoredom(100);
-        btnEnterProcessed = true;
-      }
-    } else {
-      btnEnterPressStart = 0;
-      btnEnterProcessed = false;
-    }
-    
-    // Botón DERECHO - Restaurar sueño al 100%
-    if (digitalRead(BTN_RIGHT) == LOW && digitalRead(BTN_LEFT) == HIGH && digitalRead(BTN_ENTER) == HIGH) {
-      if (btnRightPressStart == 0) {
-        btnRightPressStart = millis();
-      } else if (!btnRightProcessed && (millis() - btnRightPressStart >= 2000)) {
-        playBeep();
-        pet.setSleepiness(100);
-        btnRightProcessed = true;
-      }
-    } else {
-      btnRightPressStart = 0;
-      btnRightProcessed = false;
-    }
   }
   
   // Reproducir sonidos de estado bajo (hambre, aburrimiento, sueño)
@@ -302,71 +233,31 @@ void loop() {
           showShopMenu = false;
         }
       } else {
-      // === MODO TEST en tienda: Ajustar monedas ===
-      if (testMode) {
-        static unsigned long shopLeftPressStart = 0;
-        static unsigned long shopRightPressStart = 0;
-        static bool shopLeftProcessed = false;
-        static bool shopRightProcessed = false;
-        
-        // Botón IZQUIERDO - Poner monedas a 0
-        if (digitalRead(BTN_LEFT) == LOW && digitalRead(BTN_ENTER) == HIGH && digitalRead(BTN_RIGHT) == HIGH) {
-          if (shopLeftPressStart == 0) {
-            shopLeftPressStart = millis();
-          } else if (!shopLeftProcessed && (millis() - shopLeftPressStart >= 3000)) {
-            playBeep();
-            pet.setCoins(0);
-            shopLeftProcessed = true;
-          }
-        } else {
-          shopLeftPressStart = 0;
-          shopLeftProcessed = false;
-        }
-        
-        // Botón DERECHO - Poner monedas a 50
-        if (digitalRead(BTN_RIGHT) == LOW && digitalRead(BTN_LEFT) == HIGH && digitalRead(BTN_ENTER) == HIGH) {
-          if (shopRightPressStart == 0) {
-            shopRightPressStart = millis();
-          } else if (!shopRightProcessed && (millis() - shopRightPressStart >= 3000)) {
-            playBeep();
-            pet.setCoins(50);
-            shopRightProcessed = true;
-          }
-        } else {
-          shopRightPressStart = 0;
-          shopRightProcessed = false;
-        }
-      }
+      // Detección de pulsaciones: corta = navegar, larga = seleccionar
+      static bool shopBtnPressed = false;
+      static unsigned long shopBtnPressTime = 0;
       
-      // Detección de botones por flanco ascendente (al soltar)
-      static bool lastShopLeftState = HIGH;
-      static bool lastShopRightState = HIGH;
-      static bool lastShopEnterState = HIGH;
-      
-      bool currentShopLeftState = digitalRead(BTN_LEFT);
-      bool currentShopRightState = digitalRead(BTN_RIGHT);
       bool currentShopEnterState = digitalRead(BTN_ENTER);
       
-      // Botón izquierda - detectar al soltar
-      if (lastShopLeftState == LOW && currentShopLeftState == HIGH) {
-        shopMenuOption--;
-        if (shopMenuOption < 0) shopMenuOption = totalShopItems - 1;
-        playBeep();
-        menuOpenTime = millis();
-        delay(50);
+      // Detectar cuando se presiona el botón
+      if (!shopBtnPressed && currentShopEnterState == LOW) {
+        shopBtnPressed = true;
+        shopBtnPressTime = millis();
       }
       
-      // Botón derecha - detectar al soltar
-      if (lastShopRightState == LOW && currentShopRightState == HIGH) {
-        shopMenuOption++;
-        if (shopMenuOption >= totalShopItems) shopMenuOption = 0;
-        playBeep();
-        menuOpenTime = millis();
-        delay(50);
-      }
-      
-      // Botón Enter - detectar al soltar
-      if (lastShopEnterState == LOW && currentShopEnterState == HIGH) {
+      // Detectar cuando se suelta el botón
+      if (shopBtnPressed && currentShopEnterState == HIGH) {
+        unsigned long pressDuration = millis() - shopBtnPressTime;
+        shopBtnPressed = false;
+        
+        if (pressDuration < LONG_PRESS_TIME) {
+          // PULSACIÓN CORTA: Navegar hacia abajo (cíclico)
+          shopMenuOption++;
+          if (shopMenuOption >= totalShopItems) shopMenuOption = 0;
+          menuOpenTime = millis();
+          delay(50);
+        } else {
+          // PULSACIÓN LARGA: Seleccionar (comprar)
         bool bought = false;
         bool insufficient = false;
         if (shopMenuOption == 4 && !pet.getMemoryGameUnlocked()) {
@@ -396,13 +287,9 @@ void loop() {
           // NO cerrar la tienda, solo mostrar el mensaje superpuesto
           // showShopMenu permanece TRUE
         }
-        delay(100);
+          delay(100);
+        }
       }
-      
-      // Actualizar estados anteriores
-      lastShopLeftState = currentShopLeftState;
-      lastShopRightState = currentShopRightState;
-      lastShopEnterState = currentShopEnterState;
       
         displayMgr.showShopMenuScreen(shopMenuOption, pet.getMemoryGameUnlocked());
         if (millis() - menuOpenTime > MENU_TIMEOUT) {
@@ -426,7 +313,7 @@ void loop() {
         showGameMenu = false;
       }
     } else if (showMenu) {
-      displayMgr.showMenuScreen(menuOption);
+      displayMgr.showMenuScreen(menuOption, soundEnabled);
       // Cerrar menú si pasó mucho tiempo
       if (millis() - menuOpenTime > MENU_TIMEOUT) {
         showMenu = false;
@@ -446,30 +333,28 @@ if (currentTime - lastHeartbeat >= 2000) {
 }
 
 void handleButtons() {
-  // Variables estáticas para detección de flanco ascendente (excepto en juegos)
-  static bool lastMenuLeftState = HIGH;
-  static bool lastMenuRightState = HIGH;
-  static bool lastMenuEnterState = HIGH;
-  
-  // Si está durmiendo, cualquier botón lo despierta
+  // Si está durmiendo, pulsación larga lo despierta
   if (pet.isSleeping) {
-    bool currentLeftState = digitalRead(BTN_LEFT);
-    bool currentRightState = digitalRead(BTN_RIGHT);
+    static bool sleepBtnPressed = false;
+    static unsigned long sleepBtnPressTime = 0;
+    
     bool currentEnterState = digitalRead(BTN_ENTER);
     
-    // Detectar al soltar cualquier botón
-    if ((lastMenuLeftState == LOW && currentLeftState == HIGH) ||
-        (lastMenuRightState == LOW && currentRightState == HIGH) ||
-        (lastMenuEnterState == LOW && currentEnterState == HIGH)) {
-      pet.wakeUp();
-      playBeep();
-      delay(100);
+    if (!sleepBtnPressed && currentEnterState == LOW) {
+      sleepBtnPressed = true;
+      sleepBtnPressTime = millis();
     }
     
-    lastMenuLeftState = currentLeftState;
-    lastMenuRightState = currentRightState;
-    lastMenuEnterState = currentEnterState;
-    return; // No procesar más botones mientras duerme
+    if (sleepBtnPressed && currentEnterState == HIGH) {
+      unsigned long pressDuration = millis() - sleepBtnPressTime;
+      sleepBtnPressed = false;
+      
+      if (pressDuration >= LONG_PRESS_TIME) {
+        pet.wakeUp();
+        delay(100);
+      }
+    }
+    return;
   }
   
   if (inGame) {
@@ -484,15 +369,6 @@ void handleButtons() {
     }
     
     lastGameEnterState = currentGameEnterState;
-    
-    // Botones izquierda + derecha juntos para salir del juego
-    if (digitalRead(BTN_LEFT) == LOW && digitalRead(BTN_RIGHT) == LOW) {
-      delay(50);
-      if (digitalRead(BTN_LEFT) == LOW && digitalRead(BTN_RIGHT) == LOW) {
-        endGame();
-        delay(200);
-      }
-    }
   } else if (inMemoryGame) {
     // Controles del juego de memoria - SOLO BOTÓN CENTRO
     // Variables estáticas para medir duración de pulsación
@@ -529,128 +405,135 @@ void handleButtons() {
       delay(100);
     }
   } else if (showGameMenu) {
-    // Controles del submenú de juegos - DETECTAR AL SOLTAR
+    // Controles del submenú de juegos - Pulsación corta navega, larga selecciona
     int totalGames = pet.getMemoryGameUnlocked() ? 2 : 1;
     
-    bool currentLeftState = digitalRead(BTN_LEFT);
-    bool currentRightState = digitalRead(BTN_RIGHT);
+    static bool gameMenuBtnPressed = false;
+    static unsigned long gameMenuBtnPressTime = 0;
+    
     bool currentEnterState = digitalRead(BTN_ENTER);
     
-    // Botón izquierda - navegar izquierda
-    if (lastMenuLeftState == LOW && currentLeftState == HIGH) {
-      gameMenuOption--;
-      if (gameMenuOption < 0) gameMenuOption = totalGames - 1;
-      playBeep();
-      menuOpenTime = millis();
-      delay(50);
+    // Detectar cuando se presiona
+    if (!gameMenuBtnPressed && currentEnterState == LOW) {
+      gameMenuBtnPressed = true;
+      gameMenuBtnPressTime = millis();
     }
     
-    // Botón derecha - navegar derecha
-    if (lastMenuRightState == LOW && currentRightState == HIGH) {
-      gameMenuOption++;
-      if (gameMenuOption >= totalGames) gameMenuOption = 0;
-      playBeep();
-      menuOpenTime = millis();
-      delay(50);
-    }
-    
-    // Botón Enter - seleccionar juego
-    if (lastMenuEnterState == LOW && currentEnterState == HIGH) {
-      log_i("Game menu: Selected option %d", gameMenuOption);
-      bool success = pet.play();
-      log_i("pet.play() returned: %d (coins: %d)", success, pet.getCoins());
-      if (success) {
-        showGameMenu = false;
-        if (gameMenuOption == 0) {
-          log_i("Starting dodge game...");
-          startGame();
-        } else if (gameMenuOption == 1 && pet.getMemoryGameUnlocked()) {
-          log_i("Starting memory game...");
-          startMemoryGame();
-        }
+    // Detectar cuando se suelta
+    if (gameMenuBtnPressed && currentEnterState == HIGH) {
+      unsigned long pressDuration = millis() - gameMenuBtnPressTime;
+      gameMenuBtnPressed = false;
+      
+      if (pressDuration < LONG_PRESS_TIME) {
+        // PULSACIÓN CORTA: Navegar hacia abajo
+        gameMenuOption++;
+        if (gameMenuOption >= totalGames) gameMenuOption = 0;
+        menuOpenTime = millis();
+        delay(50);
       } else {
-        log_i("Not enough coins to play!");
-        playSound(150, 50);
-        showGameMenu = false;
-      }
-      delay(100);
-    }
-    
-    lastMenuLeftState = currentLeftState;
-    lastMenuRightState = currentRightState;
-    lastMenuEnterState = currentEnterState;
-  } else if (showMenu) {
-    // Controles del menú principal - DETECTAR AL SOLTAR
-    bool currentLeftState = digitalRead(BTN_LEFT);
-    bool currentRightState = digitalRead(BTN_RIGHT);
-    bool currentEnterState = digitalRead(BTN_ENTER);
-    
-    // Botón izquierda - navegar izquierda
-    if (lastMenuLeftState == LOW && currentLeftState == HIGH) {
-      menuOption--;
-      if (menuOption < 0) menuOption = 2;
-      playBeep();
-      menuOpenTime = millis();
-      delay(50);
-    }
-    
-    // Botón derecha - navegar derecha
-    if (lastMenuRightState == LOW && currentRightState == HIGH) {
-      menuOption++;
-      if (menuOption > 2) menuOption = 0;
-      playBeep();
-      menuOpenTime = millis();
-      delay(50);
-    }
-    
-    // Botón Enter - seleccionar acción
-    if (lastMenuEnterState == LOW && currentEnterState == HIGH) {
-      bool success = false;
-      switch(menuOption) {
-        case 0: // TIENDA
-          showMenu = false;
-          showShopMenu = true;
-          shopMenuOption = 0;
-          menuOpenTime = millis();
-          playSound(200, 100);
-          break;
-        case 1: // JUGAR
-          showMenu = false;
-          showGameMenu = true;
-          gameMenuOption = 0;
-          menuOpenTime = millis();
-          playSound(150, 100);
-          break;
-        case 2: // DORMIR
-          success = pet.sleep();
-          if (success) {
-            playSound(200, 50);
-          } else {
-            playSound(150, 50);
+        // PULSACIÓN LARGA: Seleccionar juego
+        log_i("Game menu: Selected option %d", gameMenuOption);
+        bool success = pet.play();
+        log_i("pet.play() returned: %d (coins: %d)", success, pet.getCoins());
+        if (success) {
+          showGameMenu = false;
+          if (gameMenuOption == 0) {
+            log_i("Starting dodge game...");
+            startGame();
+          } else if (gameMenuOption == 1 && pet.getMemoryGameUnlocked()) {
+            log_i("Starting memory game...");
+            startMemoryGame();
           }
-          showMenu = false;
-          break;
+        } else {
+          log_i("Not enough coins to play!");
+          playSound(150, 50);
+          showGameMenu = false;
+        }
+        delay(100);
       }
-      delay(100);
     }
+  } else if (showMenu) {
+    // Controles del menú principal - Pulsación corta navega, larga selecciona
+    static bool mainMenuBtnPressed = false;
+    static unsigned long mainMenuBtnPressTime = 0;
     
-    lastMenuLeftState = currentLeftState;
-    lastMenuRightState = currentRightState;
-    lastMenuEnterState = currentEnterState;
-  } else {
-    // Vista normal - solo ojos visible - DETECTAR AL SOLTAR
     bool currentEnterState = digitalRead(BTN_ENTER);
     
-    // Botón Enter - abrir menú (solo si no está durmiendo)
-    if (lastMenuEnterState == LOW && currentEnterState == HIGH && !pet.isSleeping) {
+    // Detectar cuando se presiona
+    if (!mainMenuBtnPressed && currentEnterState == LOW) {
+      mainMenuBtnPressed = true;
+      mainMenuBtnPressTime = millis();
+    }
+    
+    // Detectar cuando se suelta
+    if (mainMenuBtnPressed && currentEnterState == HIGH) {
+      unsigned long pressDuration = millis() - mainMenuBtnPressTime;
+      mainMenuBtnPressed = false;
+      
+      if (pressDuration < LONG_PRESS_TIME) {
+        // PULSACIÓN CORTA: Navegar hacia abajo
+        menuOption++;
+        if (menuOption > 3) menuOption = 0;
+        menuOpenTime = millis();
+        delay(50);
+      } else {
+        // PULSACIÓN LARGA: Seleccionar acción
+        bool success = false;
+        switch(menuOption) {
+          case 0: // TIENDA
+            showMenu = false;
+            showShopMenu = true;
+            shopMenuOption = 0;
+            menuOpenTime = millis();
+            playSound(200, 100);
+            break;
+          case 1: // JUGAR
+            showMenu = false;
+            showGameMenu = true;
+            gameMenuOption = 0;
+            menuOpenTime = millis();
+            playSound(150, 100);
+            break;
+          case 2: // DORMIR
+            success = pet.sleep();
+            if (success) {
+              playSound(200, 50);
+            } else {
+              playSound(150, 50);
+            }
+            showMenu = false;
+            break;
+          case 3: // SOUND
+            soundEnabled = !soundEnabled;
+            soundPrefs.putBool("enabled", soundEnabled);
+            menuOpenTime = millis();
+            break;
+        }
+        delay(100);
+      }
+    }
+  } else {
+    // Vista normal - solo ojos visible - Cualquier pulsación abre menú
+    static bool mainScreenBtnPressed = false;
+    
+    bool currentEnterState = digitalRead(BTN_ENTER);
+    
+    // Detectar cuando se presiona
+    if (!mainScreenBtnPressed && currentEnterState == LOW) {
+      mainScreenBtnPressed = true;
+    }
+    
+    // Detectar cuando se suelta
+    if (mainScreenBtnPressed && currentEnterState == HIGH) {
+      mainScreenBtnPressed = false;
+      
+      // Abrir menú con cualquier pulsación
       showMenu = true;
       menuOpenTime = millis();
       menuOption = 0;
       playSound(150, 100);
       delay(100);
     }
-    
-    lastMenuEnterState = currentEnterState;
   }
 }
 

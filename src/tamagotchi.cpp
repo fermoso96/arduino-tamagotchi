@@ -76,12 +76,12 @@ bool Tamagotchi::buyFood(int type) {
 // Lógica de compra del juego de memoria
 bool Tamagotchi::buyMemoryGame() {
   if (memoryGameUnlocked) return false;
-  if (coins < 50) {
+  if (coins < 100) {
     showInsufficientCoins = true;
     insufficientCoinsTimer = millis();
     return false;
   }
-  coins -= 50;
+  coins -= 100;
   memoryGameUnlocked = true;
   prefs.putBool("memgame", true);
   showHappyFace = true;
