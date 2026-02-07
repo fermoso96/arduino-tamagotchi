@@ -30,6 +30,11 @@ public:
   void showMemoryGameScreen(MemoryGame* memGame);
   void showMemoryGameOver(MemoryGame* memGame, int coinsEarned);
   
+  // Control de ojos para el juego de memoria
+  void showEyesBlink();    // Mostrar parpadeo
+  void showEyesLookUp();   // Mostrar mirando arriba
+  void showEyesNormal();   // Volver a normal
+  
 private:
   void drawEyesAnimated();
   void drawStatusBar();

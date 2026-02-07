@@ -170,3 +170,16 @@ void EyesManager::setAwake() {
   mood = 0;
   isBlinking = false;
 }
+
+void EyesManager::lookUp() {
+  if (eyes == nullptr) return;
+  // N = North (arriba, centro)
+  // Necesitamos usar las constantes de RoboEyes
+  eyes->setPosition(1);  // 1 = N (North) en RoboEyes
+}
+
+void EyesManager::lookCenter() {
+  if (eyes == nullptr) return;
+  // DEFAULT = centro
+  eyes->setPosition(0);  // 0 = DEFAULT en RoboEyes
+}

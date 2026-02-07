@@ -29,6 +29,8 @@ public:
   void setSleep();
   void setBlink();
   void setAwake();
+  void lookUp();
+  void lookCenter();
   
 private:
   void drawEyes();

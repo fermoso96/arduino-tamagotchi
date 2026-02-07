@@ -435,75 +435,60 @@ void handleButtons() {
   }
   
   if (inGame) {
-    // Controles del juego de esquivar - MANTENER LÓGICA ORIGINAL (al pulsar)
-    // Botón izquierda
-    if (digitalRead(BTN_LEFT) == LOW) {
-      delay(50);
-      if (digitalRead(BTN_LEFT) == LOW) {
-        game.moveLeft();
-        delay(150);
-      }
+    // Controles del juego de esquivar - SOLO BOTÓN CENTRO
+    static bool lastGameEnterState = HIGH;
+    bool currentGameEnterState = digitalRead(BTN_ENTER);
+    
+    // Detectar pulsación del botón (al soltar para evitar múltiples cambios)
+    if (lastGameEnterState == LOW && currentGameEnterState == HIGH) {
+      game.toggleLane();
+      delay(100);  // Debounce
     }
     
-    // Botón derecha
-    if (digitalRead(BTN_RIGHT) == LOW) {
-      delay(50);
-      if (digitalRead(BTN_RIGHT) == LOW) {
-        game.moveRight();
-        delay(150);
-      }
-    }
+    lastGameEnterState = currentGameEnterState;
     
-    // Botón Enter para salir del juego
-    if (digitalRead(BTN_ENTER) == LOW) {
+    // Botones izquierda + derecha juntos para salir del juego
+    if (digitalRead(BTN_LEFT) == LOW && digitalRead(BTN_RIGHT) == LOW) {
       delay(50);
-      if (digitalRead(BTN_ENTER) == LOW) {
+      if (digitalRead(BTN_LEFT) == LOW && digitalRead(BTN_RIGHT) == LOW) {
         endGame();
         delay(200);
       }
     }
   } else if (inMemoryGame) {
-    // Controles del juego de memoria - MANTENER LÓGICA ORIGINAL (al pulsar)
-    // Solo aceptar inputs cuando el juego está esperando
-    if (memoryGame.isWaitingForInput()) {
-      // Botón izquierda
-      if (digitalRead(BTN_LEFT) == LOW) {
-        delay(50);
-        if (digitalRead(BTN_LEFT) == LOW) {
-          memoryGame.registerInput(0);
-          playBeep();
-          delay(150);
-        }
+    // Controles del juego de memoria - SOLO BOTÓN CENTRO
+    // Variables estáticas para medir duración de pulsación
+    static bool memoryButtonPressed = false;
+    static unsigned long memoryButtonPressTime = 0;
+    
+    bool currentEnterState = digitalRead(BTN_ENTER);
+    
+    // Detectar cuando se PULSA el botón
+    if (!memoryButtonPressed && currentEnterState == LOW) {
+      memoryButtonPressed = true;
+      memoryButtonPressTime = millis();
+      memoryGame.registerButtonPress();
+      delay(50);  // Debounce
+    }
+    
+    // Detectar cuando se SUELTA el botón
+    if (memoryButtonPressed && currentEnterState == HIGH) {
+      unsigned long pressDuration = millis() - memoryButtonPressTime;
+      memoryButtonPressed = false;
+      
+      // Registrar el símbolo según la duración
+      memoryGame.registerButtonRelease(pressDuration);
+      
+      // Reproducir el mismo pitido que en la secuencia
+      if (pressDuration < 400) {
+        // Punto: pitido corto
+        playSound(1000, 100);
+      } else {
+        // Raya: pitido largo
+        playSound(800, 300);
       }
       
-      // Botón Enter (centro)
-      if (digitalRead(BTN_ENTER) == LOW) {
-        delay(50);
-        if (digitalRead(BTN_ENTER) == LOW) {
-          memoryGame.registerInput(1);
-          playBeep();
-          delay(150);
-        }
-      }
-      
-      // Botón derecha
-      if (digitalRead(BTN_RIGHT) == LOW) {
-        delay(50);
-        if (digitalRead(BTN_RIGHT) == LOW) {
-          memoryGame.registerInput(2);
-          playBeep();
-          delay(150);
-        }
-      }
-    } else {
-      // Botón Enter para salir del juego
-      if (digitalRead(BTN_ENTER) == LOW) {
-        delay(50);
-        if (digitalRead(BTN_ENTER) == LOW) {
-          endMemoryGame();
-          delay(200);
-        }
-      }
+      delay(100);
     }
   } else if (showGameMenu) {
     // Controles del submenú de juegos - DETECTAR AL SOLTAR
@@ -650,15 +635,6 @@ void updateGame() {
   if (game.checkCollision()) {
     endGame();
   }
-  
-  // Salir del juego con botón ENTER (presión larga o simple, simple por ahora)
-  if (digitalRead(BTN_ENTER) == LOW) {
-    delay(50);
-    if (digitalRead(BTN_ENTER) == LOW) {
-      endGame();
-      delay(200);
-    }
-  }
 }
 
 void endGame() {
@@ -692,17 +668,103 @@ void endGame() {
 }
 
 void startMemoryGame() {
-  // ...existing code...
   log_i("=== STARTING MEMORY GAME ===");
   inMemoryGame = true;
   gameStartTime = millis();
   memoryGame.reset();
-  playSound(400, 100);
-  log_i("Memory game started. inMemoryGame=%d", inMemoryGame);
+  playSound(800, 150);
+  
+  // Pequeña pausa antes de empezar
+  delay(500);
+  
+  // Mostrar la secuencia inicial
+  memoryGame.startShowingSequence();
+  
+  // Reproducir la secuencia con ojos y sonidos
+  const int* sequence = memoryGame.getSequence();
+  int seqLength = memoryGame.getSequenceLength();
+  
+  for (int i = 0; i < seqLength; i++) {
+    if (sequence[i] == MORSE_DOT) {
+      // PUNTO: parpadeo rápido + pitido corto
+      displayMgr.showEyesBlink();
+      playSound(1000, 100);  // Pitido corto y agudo
+      delay(200);
+      displayMgr.showEyesNormal();
+      delay(300);  // Pausa entre símbolos
+    } else {
+      // RAYA: parpadeo lento + pitido largo
+      displayMgr.showEyesBlink();
+      delay(100);
+      playSound(800, 300);  // Pitido largo y grave
+      delay(200);
+      displayMgr.showEyesNormal();
+      delay(400);  // Pausa más larga
+    }
+  }
+  
+  // Mostrar pantalla "REPITE"
+  delay(500);
+  memoryGame.startWaitingInput();
+  
+  log_i("Memory game started. Sequence length: %d", seqLength);
 }
 
 void updateMemoryGame() {
+  static int lastLevel = -1;
+  
   memoryGame.update();
+  
+  MemoryGameState state = memoryGame.getState();
+  int currentLevel = memoryGame.getLevel();
+  
+  // Detectar avance de nivel
+  if (lastLevel >= 0 && currentLevel > lastLevel) {
+    // Nivel completado! Mostrar secuencia nueva
+    log_i("Level up! New level: %d", currentLevel);
+    
+    // Pequeña pausa y sonido de éxito
+    displayMgr.showEyesNormal();
+    playSound(1500, 100);
+    delay(200);
+    playSound(1800, 100);
+    delay(500);
+    
+    // Mostrar la nueva secuencia
+    memoryGame.startShowingSequence();
+    const int* sequence = memoryGame.getSequence();
+    int seqLength = memoryGame.getSequenceLength();
+    
+    for (int i = 0; i < seqLength; i++) {
+      if (sequence[i] == MORSE_DOT) {
+        // PUNTO: parpadeo rápido + pitido corto
+        displayMgr.showEyesBlink();
+        playSound(1000, 100);
+        delay(200);
+        displayMgr.showEyesNormal();
+        delay(300);
+      } else {
+        // RAYA: parpadeo lento + pitido largo
+        displayMgr.showEyesBlink();
+        delay(100);
+        playSound(800, 300);
+        delay(200);
+        displayMgr.showEyesNormal();
+        delay(400);
+      }
+    }
+    
+    delay(500);
+    memoryGame.startWaitingInput();
+  }
+  
+  lastLevel = currentLevel;
+  
+  if (state == MGS_GAME_OVER) {
+    lastLevel = -1;  // Reset para próximo juego
+    endMemoryGame();
+    return;
+  }
   
   // Mostrar pantalla del juego de memoria
   displayMgr.showMemoryGameScreen(&memoryGame);
@@ -711,25 +773,27 @@ void updateMemoryGame() {
 void endMemoryGame() {
   inMemoryGame = false;
   
-  // Calcular monedas ganadas basadas en el nivel alcanzado
+  // Calcular monedas ganadas: nivel × 3
   int finalLevel = memoryGame.getLevel();
-  int coinsEarned = (finalLevel * (finalLevel + 1)) / 2;
-  pet.addCoins(coinsEarned);
-  pet.addBoredom(coinsEarned);
+  int coinsEarned = finalLevel * 3;
   
-  // Mostrar animación HAPPY y dos pitidos agudos
-  pet.showHappyFace = true;
-  pet.happyFaceTimer = millis();
-  playSound(1200, 50);
-  delay(0);
-  playSound(1200, 50);
-  // Esperar 0.2 segundos para la animación
-  unsigned long t0 = millis();
-  while (millis() - t0 < 200) {
-    displayMgr.showMainScreen();
-    delay(0);
+  pet.addCoins(coinsEarned);
+  pet.addBoredom(5);  // Pequeño aumento de diversión
+  
+  // Mostrar animación HAPPY si ganó monedas
+  if (coinsEarned > 0) {
+    pet.showHappyFace = true;
+    pet.happyFaceTimer = millis();
+    playSound(1200, 50);
+    delay(100);
+    playSound(1200, 50);
   }
+  
   // Mostrar pantalla de fin de juego
   displayMgr.showMemoryGameOver(&memoryGame, coinsEarned);
-  // Sin delay
+  
+  // Esperar un momento antes de volver
+  delay(3000);
+  
+  log_i("Memory game ended. Level: %d, Coins earned: %d", finalLevel, coinsEarned);
 }

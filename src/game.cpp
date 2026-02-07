@@ -2,7 +2,7 @@
 #include <Preferences.h>
 
 DodgeGame::DodgeGame() {
-  playerLane = 1;
+  playerLane = 1;  // Carril central
   score = 0;
   level = 1;
   record = 0;
@@ -41,7 +41,7 @@ void DodgeGame::saveRecord() {
 }
 
 void DodgeGame::reset() {
-  playerLane = 1;
+  playerLane = 1;  // Carril central
   score = 0;
   level = 1;
   obstacleSpeed = 2;
@@ -74,16 +74,9 @@ void DodgeGame::update() {
   }
 }
 
-void DodgeGame::moveLeft() {
-  if (playerLane > 0) {
-    playerLane--;
-  }
-}
-
-void DodgeGame::moveRight() {
-  if (playerLane < NUM_LANES - 1) {
-    playerLane++;
-  }
+void DodgeGame::toggleLane() {
+  // Alternar entre carril 1 (central) y carril 2 (inferior)
+  playerLane = (playerLane == 1) ? 2 : 1;
 }
 
 void DodgeGame::spawnObstacle() {
@@ -93,7 +86,7 @@ void DodgeGame::spawnObstacle() {
   for (int i = 0; i < MAX_OBSTACLES; i++) {
     if (!obstacles[i].active) {
       obstacles[i].x = GAME_WIDTH;
-      obstacles[i].lane = random(0, NUM_LANES);
+      obstacles[i].lane = random(1, 3);  // Solo carriles 1 (central) y 2 (inferior)
       obstacles[i].active = true;
       obstacleCount++;
       break;

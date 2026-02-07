@@ -246,6 +246,7 @@ void DisplayManager::drawCoins() {
 }
 
 void DisplayManager::drawLanes(DodgeGame* game) {
+  // Con 3 carriles, dibujamos 2 líneas divisorias
   for (int i = 1; i < 3; i++) {
     display->drawLine(0, i * LANE_HEIGHT, GAME_WIDTH, i * LANE_HEIGHT, SSD1306_WHITE);
   }
@@ -340,59 +341,45 @@ void DisplayManager::showGameMenuScreen(int selectedOption) {
 void DisplayManager::showMemoryGameScreen(MemoryGame* memGame) {
   display->clearDisplay();
   
-  display->setTextSize(1);
-  display->setTextColor(SSD1306_WHITE);
-  display->setCursor(0, 0);
-  display->print("Nivel: ");
-  display->print(memGame->getLevel());
-  display->setCursor(70, 0);
-  display->print("Score: ");
-  display->print(memGame->getScore());
+  MemoryGameState state = memGame->getState();
   
-  // Línea divisoria
-  display->drawLine(0, 10, 127, 10, SSD1306_WHITE);
-  
-  // Mostrar secuencia si no está esperando input
-  if (!memGame->isWaitingForInput()) {
-    display->setCursor(20, 25);
-    display->setTextSize(1);
-    display->print("Memoriza...");
-  } else {
-    // Mostrar botones para el jugador
+  if (state == MGS_SHOWING_SEQUENCE) {
+    // Durante la secuencia, solo se muestran los ojos y animaciones
+    // (manejado en main.cpp)
+    display->setTextSize(2);
+    display->setTextColor(SSD1306_WHITE);
     display->setCursor(15, 25);
-    display->setTextSize(1);
-    display->print("Repite:");
+    display->print("Observa...");
+  } 
+  else if (state == MGS_WAITING_INPUT) {
+    // Pantalla "REPITE" con nivel y record
+    display->setTextSize(2);
+    display->setTextColor(SSD1306_WHITE);
+    display->setCursor(25, 10);
+    display->print("REPITE");
     
-    // Mostrar progreso
-    display->setCursor(10, 40);
-    display->print(memGame->getCurrentIndex());
+    // Línea divisoria
+    display->drawLine(0, 30, 127, 30, SSD1306_WHITE);
+    
+    // Mostrar nivel actual
+    display->setTextSize(1);
+    display->setCursor(10, 38);
+    display->print("Nivel: ");
+    display->print(memGame->getLevel());
+    
+    // Mostrar record
+    display->setCursor(10, 50);
+    display->print("Record: ");
+    display->print(memGame->getHighScore());
+    
+    // Indicador de progreso
+    display->setCursor(85, 38);
+    display->print(memGame->getCurrentInputIndex());
     display->print("/");
     display->print(memGame->getSequenceLength());
-    
-    // Indicadores de botones
-    int y = 52;
-    display->drawRect(5, y, 30, 10, SSD1306_WHITE);
-    display->setCursor(10, y+2);
-    display->print("IZQ");
-    
-    display->drawRect(45, y, 35, 10, SSD1306_WHITE);
-    display->setCursor(50, y+2);
-    display->print("CENT");
-    
-    display->drawRect(90, y, 30, 10, SSD1306_WHITE);
-    display->setCursor(95, y+2);
-    display->print("DER");
-    
-    // Resaltar último input
-    int lastInput = memGame->getLastInput();
-    if (lastInput >= 0) {
-      int xPos = (lastInput == 0) ? 5 : ((lastInput == 1) ? 45 : 90);
-      int width = (lastInput == 1) ? 35 : 30;
-      display->fillRect(xPos, y, width, 10, SSD1306_WHITE);
-      display->setTextColor(SSD1306_BLACK);
-      display->setCursor((lastInput == 0) ? 10 : ((lastInput == 1) ? 50 : 95), y+2);
-      display->print((lastInput == 0) ? "IZQ" : ((lastInput == 1) ? "CENT" : "DER"));
-    }
+  }
+  else if (state == MGS_GAME_OVER) {
+    // Pantalla de game over (manejada por showMemoryGameOver)
   }
   
   display->display();
@@ -403,17 +390,55 @@ void DisplayManager::showMemoryGameOver(MemoryGame* memGame, int coinsEarned) {
   
   display->setTextSize(2);
   display->setTextColor(SSD1306_WHITE);
-  display->setCursor(20, 10);
+  display->setCursor(10, 5);
   display->println("GAME OVER");
   
   display->setTextSize(1);
-  display->setCursor(10, 35);
-  display->print("Nivel: ");
+  display->setCursor(10, 30);
+  display->print("Nivel alcanzado: ");
   display->println(memGame->getLevel());
   
-  display->setCursor(10, 50);
-  display->print("Coins: +");
+  display->setCursor(10, 43);
+  display->print("Record: ");
+  display->println(memGame->getHighScore());
+  
+  display->setCursor(10, 54);
+  display->print("Monedas: +");
   display->println(coinsEarned);
   
+  display->display();
+}
+
+void DisplayManager::showEyesBlink() {
+  display->clearDisplay();
+  // Dibujar ojos cerrados simples (líneas horizontales)
+  // Ojo izquierdo
+  display->drawLine(32, 32, 52, 32, SSD1306_WHITE);
+  // Ojo derecho
+  display->drawLine(76, 32, 96, 32, SSD1306_WHITE);
+  display->display();
+}
+
+void DisplayManager::showEyesLookUp() {
+  display->clearDisplay();
+  // Dibujar ojos mirando arriba
+  // Ojo izquierdo (círculo vacío con pupila arriba)
+  display->drawCircle(42, 28, 10, SSD1306_WHITE);
+  display->fillCircle(42, 22, 4, SSD1306_WHITE);
+  // Ojo derecho
+  display->drawCircle(86, 28, 10, SSD1306_WHITE);
+  display->fillCircle(86, 22, 4, SSD1306_WHITE);
+  display->display();
+}
+
+void DisplayManager::showEyesNormal() {
+  display->clearDisplay();
+  // Dibujar ojos abiertos normales
+  // Ojo izquierdo (círculo vacío con pupila centro)
+  display->drawCircle(42, 32, 10, SSD1306_WHITE);
+  display->fillCircle(42, 32, 4, SSD1306_WHITE);
+  // Ojo derecho
+  display->drawCircle(86, 32, 10, SSD1306_WHITE);
+  display->fillCircle(86, 32, 4, SSD1306_WHITE);
   display->display();
 }

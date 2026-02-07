@@ -38,8 +38,7 @@ public:
   void loadRecord();
   void saveRecord();
   
-  void moveLeft();
-  void moveRight();
+  void toggleLane();  // Alternar entre carril central (1) e inferior (2)
   
   bool checkCollision();
   
