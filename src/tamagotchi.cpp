@@ -16,7 +16,7 @@ Tamagotchi::Tamagotchi() {
   
   lastMinuteUpdate = 0;
   sleepStartTime = 0;
-  sleepDuration = 10 * 60 * 1000; // 10 minutos
+  lastSleepTick = 0;
 }
 
 void Tamagotchi::initialize() {
@@ -51,6 +51,7 @@ bool Tamagotchi::buyFood(int type) {
   }
   coins -= cost;
   hunger = min(100, hunger + restore);
+  sleepiness = max(0, sleepiness - 10); // Reducir sueño 10% al comer
   showHappyFace = true;
   happyFaceTimer = millis();
   saveStats();
@@ -94,8 +95,16 @@ void Tamagotchi::update() {
   
   // Si está durmiendo
   if (isSleeping) {
-    if (currentTime - sleepStartTime >= sleepDuration) {
-      wakeUp();
+    // Cada 5 segundos, aumentar sueño en 1%
+    if (currentTime - lastSleepTick >= 5000) {
+      sleepiness = min(100, sleepiness + 1);
+      lastSleepTick = currentTime;
+      saveStats();
+      
+      // Si llega a 100%, despertar automáticamente
+      if (sleepiness >= 100) {
+        wakeUp();
+      }
     }
     return; // No actualizar otros parámetros mientras duerme
   }
@@ -107,14 +116,19 @@ void Tamagotchi::update() {
 void Tamagotchi::updatePerMinute() {
   unsigned long currentTime = millis();
   if (currentTime - lastMinuteUpdate >= 60000) { // 60 segundos
-    // Hambre pierde 4% por minuto
-    hunger = max(0, hunger - 4);
+    // Hambre pierde 1% por minuto
+    hunger = max(0, hunger - 1);
     
-    // Aburrimiento pierde 2% por minuto
-    boredom = max(0, boredom - 2);
+    // Aburrimiento pierde 1% por minuto
+    boredom = max(0, boredom - 1);
     
-    // Sueño pierde 1% por minuto
-    sleepiness = max(0, sleepiness - 1);
+    // Sueño pierde 1% cada 2 minutos (contador interno)
+    static int sleepCounter = 0;
+    sleepCounter++;
+    if (sleepCounter >= 2) {
+      sleepiness = max(0, sleepiness - 1);
+      sleepCounter = 0;
+    }
     
     // Si el sueño llegó a 0%, dormir automáticamente
     if (sleepiness <= 0 && !isSleeping) {
@@ -172,9 +186,7 @@ bool Tamagotchi::play() {
   // Sueño baja 15%
   sleepiness = max(0, sleepiness - 15);
   
-  // Mostrar cara feliz
-  showHappyFace = true;
-  happyFaceTimer = millis();
+  // NO mostrar cara feliz al iniciar (se mostrará al terminar el juego)
   
   saveStats();
   return true;
@@ -183,8 +195,8 @@ bool Tamagotchi::play() {
 bool Tamagotchi::sleep() {
   if (isSleeping) return false;
   
-  // Validación: si tiene >25% sueño (no tiene sueño)
-  if (sleepiness > 25) {
+  // Validación: si tiene >20% sueño (no tiene sueño)
+  if (sleepiness > 20) {
     showAngryFace = true;
     angryFaceTimer = millis();
     return false;
@@ -192,15 +204,21 @@ bool Tamagotchi::sleep() {
   
   isSleeping = true;
   sleepStartTime = millis();
+  lastSleepTick = millis();
   saveStats();
   return true;
 }
 
 void Tamagotchi::wakeUp() {
+  // Si despierta con 20% o menos de sueño, mostrar animación enfadado
+  if (sleepiness <= 20) {
+    showAngryFace = true;
+    angryFaceTimer = millis();
+  }
+  
   isSleeping = false;
   
-  // Al despertar: sueño al 100%, aburrimiento +20%, hambre -15%
-  sleepiness = 100;
+  // Al despertar: mantener sueño actual, aburrimiento +20%, hambre -15%
   boredom = min(100, boredom + 20);
   hunger = max(0, hunger - 15);
   
@@ -222,11 +240,11 @@ int Tamagotchi::getMood() const {
   // Prioridad 1: mostrar cara feliz si está activa
   if (showHappyFace) return 3; // HAPPY (RoboEyes)
 
-  // Prioridad 2: sueño muy bajo → SLEEPY (50% cerrado)
-  if (sleepiness < 20) return 4; // SLEEPY (RoboEyes)
-  
-  // Prioridad 3: mostrar cara enfadada si está activa
+  // Prioridad 2: mostrar cara enfadada si está activa
   if (showAngryFace) return 2; // ANGRY
+  
+  // Prioridad 3: sueño muy bajo → SLEEPY (50% cerrado)
+  if (sleepiness < 20) return 4; // SLEEPY (RoboEyes)
   
   // Hambre < 20% → ANGRY (2)
   if (hunger < 20) return 2;

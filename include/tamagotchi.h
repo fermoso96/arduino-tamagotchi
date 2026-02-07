@@ -5,9 +5,6 @@
 #include <Preferences.h>
 
 class Tamagotchi {
-  void setHunger(int h) { hunger = constrain(h, 0, 100); }
-  void setSleepiness(int s) { sleepiness = constrain(s, 0, 100); }
-  void setBoredom(int b) { boredom = constrain(b, 0, 100); }
 private:
   // Estadísticas (0-100%): hambre, aburrimiento y sueño
   // Hambre: 0=hambriento, 100=lleno
@@ -21,9 +18,9 @@ private:
   
   unsigned long lastMinuteUpdate;
   unsigned long sleepStartTime;
-  unsigned long sleepDuration; // 15 minutos en ms
   
   Preferences prefs;
+  unsigned long lastSleepTick; // Para controlar incremento de sueño cada 5 segundos
   
 public:
   bool isSleeping;
@@ -56,6 +53,12 @@ public:
   int getSleepiness() const { return sleepiness; }
   int getCoins() const { return coins; }
   bool getIsSleeping() const { return isSleeping; }
+  
+  // Setters (para modo TEST)
+  void setHunger(int h) { hunger = constrain(h, 0, 100); }
+  void setSleepiness(int s) { sleepiness = constrain(s, 0, 100); }
+  void setBoredom(int b) { boredom = constrain(b, 0, 100); }
+  void setCoins(int c) { coins = max(0, c); }
   
   // Determinar mood para ojos
   int getMood() const;

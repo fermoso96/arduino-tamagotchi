@@ -20,6 +20,7 @@ private:
   int playerLane;
   int score;
   int level;
+  int record; // Récord de nivel más alto alcanzado
   float obstacleSpeed;
   unsigned long lastObstacleTime;
   unsigned long lastUpdateTime;
@@ -27,12 +28,15 @@ private:
   
   Obstacle obstacles[MAX_OBSTACLES];
   int obstacleCount;
+  int maxActiveObstacles; // Número máximo de cajas activas según nivel
   
 public:
   DodgeGame();
   void initialize();
   void reset();
   void update();
+  void loadRecord();
+  void saveRecord();
   
   void moveLeft();
   void moveRight();
@@ -42,6 +46,7 @@ public:
   // Getters
   int getScore() const { return score; }
   int getLevel() const { return level; }
+  int getRecord() const { return record; }
   int getPlayerLane() const { return playerLane; }
   float getObstacleSpeed() const { return obstacleSpeed; }
   

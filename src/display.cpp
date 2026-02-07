@@ -182,11 +182,17 @@ void DisplayManager::showGameScreen(DodgeGame* game) {
   drawPlayer(game);
   drawObstacles(game);
   
+  // Nivel en la izquierda
   display->setTextSize(1);
   display->setTextColor(SSD1306_WHITE);
   display->setCursor(0, 0);
   display->print("Lvl: ");
   display->print(game->getLevel());
+  
+  // Récord en la derecha
+  display->setCursor(80, 0);
+  display->print("RCRD:");
+  display->print(game->getRecord());
   
   display->display();
 }

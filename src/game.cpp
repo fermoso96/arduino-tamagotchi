@@ -1,14 +1,17 @@
 #include "game.h"
+#include <Preferences.h>
 
 DodgeGame::DodgeGame() {
   playerLane = 1;
   score = 0;
   level = 1;
+  record = 0;
   obstacleSpeed = 2;
   lastObstacleTime = 0;
   lastUpdateTime = 0;
   obstacleCount = 0;
   boxesDodgedThisLevel = 0;
+  maxActiveObstacles = 1;
   
   for (int i = 0; i < MAX_OBSTACLES; i++) {
     obstacles[i].active = false;
@@ -16,7 +19,25 @@ DodgeGame::DodgeGame() {
 }
 
 void DodgeGame::initialize() {
+  loadRecord();
   reset();
+}
+
+void DodgeGame::loadRecord() {
+  Preferences prefs;
+  prefs.begin("tamagotchi", true); // Solo lectura
+  record = prefs.getInt("gameRecord", 0);
+  prefs.end();
+}
+
+void DodgeGame::saveRecord() {
+  if (level > record) {
+    record = level;
+    Preferences prefs;
+    prefs.begin("tamagotchi", false);
+    prefs.putInt("gameRecord", record);
+    prefs.end();
+  }
 }
 
 void DodgeGame::reset() {
@@ -28,6 +49,7 @@ void DodgeGame::reset() {
   lastUpdateTime = millis();
   obstacleCount = 0;
   boxesDodgedThisLevel = 0;
+  maxActiveObstacles = 1; // Empezar con 1 caja
   
   for (int i = 0; i < MAX_OBSTACLES; i++) {
     obstacles[i].active = false;
@@ -65,6 +87,9 @@ void DodgeGame::moveRight() {
 }
 
 void DodgeGame::spawnObstacle() {
+  // Solo spawnear si no hemos alcanzado el máximo de cajas activas para este nivel
+  if (obstacleCount >= maxActiveObstacles) return;
+  
   for (int i = 0; i < MAX_OBSTACLES; i++) {
     if (!obstacles[i].active) {
       obstacles[i].x = GAME_WIDTH;
@@ -124,6 +149,8 @@ void DodgeGame::increaseLevel() {
   boxesDodgedThisLevel = 0;  // Resetear contador de cajas
   // Aumentar velocidad de forma muy gradual: +0.3 cada nivel
   obstacleSpeed = min(5.5, obstacleSpeed + 0.3);
+  // Aumentar número de cajas activas (máximo MAX_OBSTACLES)
+  maxActiveObstacles = min(MAX_OBSTACLES, level);
 }
 
 int DodgeGame::getBoxesRequiredForLevel(int level) const {

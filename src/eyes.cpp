@@ -46,10 +46,10 @@ void EyesManager::update() {
     isBlinking = !isBlinking;
     lastBlinkTime = currentTime;
     if (isBlinking) {
-      blinkInterval = 150;
+      blinkInterval = 40; // Parpadeo más rápido
       log_i("Blink ON");
     } else {
-      blinkInterval = 3000 + random(2000);
+      blinkInterval = 1200 + random(800); // Intervalo más corto
       log_i("Blink OFF");
     }
   }
@@ -83,11 +83,11 @@ void EyesManager::drawEyes() {
     isBlinking = !isBlinking;
     lastBlinkTime = currentTime;
     if (isBlinking) {
-      blinkInterval = 60;  // Duración del parpadeo
+      blinkInterval = 40;  // Parpadeo más rápido
       eyes->eyeL_open = false;
       eyes->eyeR_open = false;
     } else {
-      blinkInterval = 3000 + random(2000);  // Intervalo hasta próximo parpadeo
+      blinkInterval = 1200 + random(800);  // Intervalo más corto
       eyes->eyeL_open = true;
       eyes->eyeR_open = true;
     }
