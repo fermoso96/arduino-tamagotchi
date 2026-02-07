@@ -273,8 +273,13 @@ bool Tamagotchi::sleep() {
 }
 
 void Tamagotchi::wakeUp() {
+  // Si despierta con 60% o más de sueño, mostrar animación feliz
+  if (sleepiness >= 60) {
+    showHappyFace = true;
+    happyFaceTimer = millis();
+  }
   // Si despierta con 20% o menos de sueño, mostrar animación enfadado
-  if (sleepiness <= 20) {
+  else if (sleepiness <= 20) {
     showAngryFace = true;
     angryFaceTimer = millis();
   }
