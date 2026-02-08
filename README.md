@@ -15,15 +15,15 @@ Un Tamagotchi interactivo con ESP32 C3 Mini, display OLED y 4 juegos diferentes 
 ### Estados del Tamagotchi
 
 - **Normal**: Estado saludable
-- **Hambriento**: Cuando el hambre > 70
-- **Aburrido**: Cuando el aburrimiento > 70
-- **Cansado**: Cuando el cansancio > 70
-- **Durmiendo**: Duerme 20 minutos automáticamente si está muy cansado
+- **Hambriento**: Cuando el hambre esta por debajo de 20%
+- **Aburrido**: Cuando el aburrimiento esta por debajo de 20%
+- **Cansado**: Cuando el sueño esta por debajo de 20%
+- **Durmiendo**: Duerme automaticamente si el sueño esta por debajo de 20%
 
 ### Mecánicas de Cuidado
 
-- **Alimentar**: Reduce hambre, aumenta salud
-- **Jugar**: Reduce aburrimiento, aumenta cansancio, aumenta salud
+- **Alimentar**: Reduce hambre, aumenta el sueño.
+- **Jugar**: Reduce aburrimiento, aumenta cansancio
 - **Dormir**: Restaura el cansancio y reduce el aburrimiento
 
 ### Juegos Disponibles
