@@ -6,6 +6,7 @@ Tamagotchi::Tamagotchi() {
   sleepiness = 100;   // Empieza bien
   coins = 0;
   memoryGameUnlocked = false;
+  ticTacToeUnlocked = false;
   isSleeping = false;
   showAngryFace = false;
   angryFaceTimer = 0;
@@ -28,8 +29,9 @@ Tamagotchi::Tamagotchi() {
 void Tamagotchi::initialize() {
   prefs.begin("tamagotchi", false);
   loadStats();
-  // Leer si el juego de memoria está desbloqueado
+  // Leer si los juegos están desbloqueados
   memoryGameUnlocked = prefs.getBool("memgame", false);
+  ticTacToeUnlocked = prefs.getBool("tictactoe", false);
   
   lastMinuteUpdate = millis();
   
@@ -84,6 +86,23 @@ bool Tamagotchi::buyMemoryGame() {
   coins -= 100;
   memoryGameUnlocked = true;
   prefs.putBool("memgame", true);
+  showHappyFace = true;
+  happyFaceTimer = millis();
+  saveStats();
+  return true;
+}
+
+// Lógica de compra del juego de tres en raya
+bool Tamagotchi::buyTicTacToeGame() {
+  if (ticTacToeUnlocked) return false;
+  if (coins < 100) {
+    showInsufficientCoins = true;
+    insufficientCoinsTimer = millis();
+    return false;
+  }
+  coins -= 100;
+  ticTacToeUnlocked = true;
+  prefs.putBool("tictactoe", true);
   showHappyFace = true;
   happyFaceTimer = millis();
   saveStats();

@@ -6,6 +6,7 @@
 #include "tamagotchi.h"
 #include "game.h"
 #include "memorygame.h"
+#include "tictactoe.h"
 #include "display.h"
 
 // Configuración de pines
@@ -21,12 +22,14 @@ Adafruit_SSD1306 display(128, 64, &Wire, -1);
 Tamagotchi pet;
 DodgeGame game;
 MemoryGame memoryGame;
+TicTacToeGame ticTacToeGame;
 DisplayManager displayMgr;
 unsigned long lastUpdateTime = 0;
 unsigned long gameStartTime = 0;
 unsigned long menuOpenTime = 0;
 bool inGame = false;
 bool inMemoryGame = false;
+bool inTicTacToe = false;
 bool showMenu = false;
 bool showGameMenu = false; // Submenú de juegos
 bool showShopMenu = false; // Submenú de tienda
@@ -50,6 +53,9 @@ void endGame();
 void startMemoryGame();
 void updateMemoryGame();
 void endMemoryGame();
+void startTicTacToe();
+void updateTicTacToe();
+void endTicTacToe();
 void handleButtons();
 void playSound(int frequency, int duration);
 
@@ -160,6 +166,9 @@ void setup() {
   // Inicializar juego de memoria
   memoryGame.initialize();
   
+  // Inicializar juego de tres en raya
+  ticTacToeGame.initialize();
+  
   // Inicializar display manager
   displayMgr.initialize(&display, &pet);
   
@@ -224,7 +233,11 @@ void loop() {
     // Prioridad: si estamos en la tienda, gestionar eso primero
     if (showShopMenu) {
       // Controles de la tienda y renderizado
-      int totalShopItems = pet.getMemoryGameUnlocked() ? 4 : 5;
+      // Calcular total de items disponibles
+      int totalShopItems = 4; // Siempre hay 4 comidas
+      if (!pet.getMemoryGameUnlocked()) totalShopItems++; // +1 si memoria no desbloqueado
+      if (!pet.getTicTacToeUnlocked()) totalShopItems++; // +1 si tres en raya no desbloqueado
+      
       // Si hay mensaje de monedas insuficientes, mostrarlo y bloquear controles
       if (pet.showInsufficientCoins) {
         // Solo mostrar la pantalla de mensaje, sin aceptar controles
@@ -260,38 +273,52 @@ void loop() {
           // PULSACIÓN LARGA: Seleccionar (comprar)
         bool bought = false;
         bool insufficient = false;
-        if (shopMenuOption == 4 && !pet.getMemoryGameUnlocked()) {
-          bought = pet.buyMemoryGame();
-          if (!bought) { playSound(150, 50); insufficient = true; }
-          else {
-            // Si compra exitosa, cerrar tienda y dejar que la animación happy se gestione en el loop
-            pet.showInsufficientCoins = false;
-            showShopMenu = false;
+        
+        // Mapear la opción seleccionada al item real
+        int realItem = shopMenuOption;
+        if (shopMenuOption >= 4) {
+          // Estamos en la zona de juegos
+          if (!pet.getMemoryGameUnlocked()) {
+            // Si memoria no está desbloqueado, item 4 = memoria
+            if (shopMenuOption == 4) {
+              bought = pet.buyMemoryGame();
+            } else if (shopMenuOption == 5) {
+              // Item 5 = tres en raya
+              bought = pet.buyTicTacToeGame();
+            }
+          } else {
+            // Si memoria ya está desbloqueado, item 4 = tres en raya
+            if (shopMenuOption == 4) {
+              bought = pet.buyTicTacToeGame();
+            }
           }
         } else {
+          // Comida (items 0-3)
           bought = pet.buyFood(shopMenuOption);
-          if (!bought) { playSound(150, 50); insufficient = true; }
-          else {
-            // Si compra exitosa, cerrar tienda y dejar que la animación happy se gestione en el loop
-            pet.showInsufficientCoins = false;
-            showShopMenu = false;
-          }
         }
+        
+        if (!bought) { 
+          playSound(150, 50); 
+          insufficient = true; 
+        } else {
+          // Si compra exitosa, cerrar tienda y dejar que la animación happy se gestione en el loop
+          pet.showInsufficientCoins = false;
+          showShopMenu = false;
+        }
+        
         menuOpenTime = millis();
-        if (shopMenuOption == 4 && bought) {
+        if (bought && shopMenuOption >= 4) {
           shopMenuOption = 0;
         }
         if (insufficient) {
           pet.showInsufficientCoins = true;
           pet.insufficientCoinsTimer = millis();
-          // NO cerrar la tienda, solo mostrar el mensaje superpuesto
-          // showShopMenu permanece TRUE
         }
           delay(100);
         }
       }
       
-        displayMgr.showShopMenuScreen(shopMenuOption, pet.getMemoryGameUnlocked());
+        displayMgr.showShopMenuScreen(shopMenuOption);
         if (millis() - menuOpenTime > MENU_TIMEOUT) {
           showShopMenu = false;
         }
@@ -306,6 +333,8 @@ void loop() {
       updateGame();
     } else if (inMemoryGame) {
       updateMemoryGame();
+    } else if (inTicTacToe) {
+      updateTicTacToe();
     } else if (showGameMenu) {
       displayMgr.showGameMenuScreen(gameMenuOption);
       // Cerrar menú si pasó mucho tiempo
@@ -404,9 +433,45 @@ void handleButtons() {
       
       delay(100);
     }
+  } else if (inTicTacToe) {
+    // Controles del juego de tres en raya - SOLO BOTÓN CENTRO
+    static bool ticTacBtnPressed = false;
+    static unsigned long ticTacBtnPressTime = 0;
+    
+    bool currentEnterState = digitalRead(BTN_ENTER);
+    
+    // Detectar cuando se PULSA el botón
+    if (!ticTacBtnPressed && currentEnterState == LOW) {
+      ticTacBtnPressed = true;
+      ticTacBtnPressTime = millis();
+    }
+    
+    // Detectar cuando se SUELTA el botón
+    if (ticTacBtnPressed && currentEnterState == HIGH) {
+      unsigned long pressDuration = millis() - ticTacBtnPressTime;
+      ticTacBtnPressed = false;
+      
+      if (pressDuration < LONG_PRESS_TIME) {
+        // PULSACIÓN CORTA: Mover cursor
+        ticTacToeGame.moveCursor();
+        playBeep();
+      } else {
+        // PULSACIÓN LARGA: Colocar ficha
+        if (ticTacToeGame.tryPlacePiece()) {
+          playSound(800, 150);
+        } else {
+          playSound(200, 100);  // Error: casilla ocupada
+        }
+      }
+      
+      delay(100);
+    }
   } else if (showGameMenu) {
     // Controles del submenú de juegos - Pulsación corta navega, larga selecciona
-    int totalGames = pet.getMemoryGameUnlocked() ? 2 : 1;
+    // Calcular total de juegos disponibles
+    int totalGames = 1; // Siempre hay esquivar
+    if (pet.getMemoryGameUnlocked()) totalGames++; // +1 si memoria desbloqueado
+    if (pet.getTicTacToeUnlocked()) totalGames++; // +1 si tres en raya desbloqueado
     
     static bool gameMenuBtnPressed = false;
     static unsigned long gameMenuBtnPressTime = 0;
@@ -437,12 +502,26 @@ void handleButtons() {
         log_i("pet.play() returned: %d (coins: %d)", success, pet.getCoins());
         if (success) {
           showGameMenu = false;
+          
+          // Mapear la opción a juego real
           if (gameMenuOption == 0) {
             log_i("Starting dodge game...");
             startGame();
-          } else if (gameMenuOption == 1 && pet.getMemoryGameUnlocked()) {
-            log_i("Starting memory game...");
-            startMemoryGame();
+          } else if (gameMenuOption == 1) {
+            // Item 1 puede ser memoria o tres en raya
+            if (pet.getMemoryGameUnlocked()) {
+              log_i("Starting memory game...");
+              startMemoryGame();
+            } else if (pet.getTicTacToeUnlocked()) {
+              log_i("Starting tic-tac-toe...");
+              startTicTacToe();
+            }
+          } else if (gameMenuOption == 2) {
+            // Item 2 solo existe si memoria está desbloqueado
+            if (pet.getTicTacToeUnlocked()) {
+              log_i("Starting tic-tac-toe...");
+              startTicTacToe();
+            }
           }
         } else {
           log_i("Not enough coins to play!");
@@ -718,3 +797,74 @@ void endMemoryGame() {
   
   log_i("Memory game ended. Level: %d, Coins earned: %d", finalLevel, coinsEarned);
 }
+
+void startTicTacToe() {
+  log_i("=== STARTING TIC-TAC-TOE ===");
+  inTicTacToe = true;
+  gameStartTime = millis();
+  ticTacToeGame.reset();
+  playSound(600, 150);
+  delay(300);
+  
+  log_i("Tic-Tac-Toe started. Player first: %d", ticTacToeGame.isPlayerFirst());
+}
+
+void updateTicTacToe() {
+  // Actualizar lógica del juego (IA del Tamagotchi)
+  ticTacToeGame.update();
+  
+  // Mostrar pantalla del juego
+  displayMgr.showTicTacToeScreen(&ticTacToeGame);
+  
+  // Comprobar si el juego ha terminado
+  if (ticTacToeGame.getState() == TIC_GAME_OVER) {
+    delay(500);  // Pausa antes de mostrar resultado
+    endTicTacToe();
+  }
+}
+
+void endTicTacToe() {
+  inTicTacToe = false;
+  
+  GameResult result = ticTacToeGame.getResult();
+  int coinsEarned = 0;
+  
+  // Actualizar estadísticas
+  ticTacToeGame.updateStats(result);
+  
+  // Calcular monedas según el resultado
+  if (result == RESULT_PLAYER_WIN) {
+    coinsEarned = 3;  // Victoria: +3 monedas
+    pet.addCoins(coinsEarned);
+    pet.addBoredom(5);  // Diversión
+    
+  } else if (result == RESULT_TAMAGOTCHI_WIN) {
+    coinsEarned = -1;  // Derrota: -1 moneda
+    pet.addCoins(coinsEarned);
+    pet.addBoredom(3);  // Algo de diversión
+    
+  } else if (result == RESULT_DRAW) {
+    coinsEarned = 1;  // Empate: +1 moneda
+    pet.addCoins(coinsEarned);
+    pet.addBoredom(4);  // Diversión moderada
+  }
+  
+  // Mostrar pantalla de fin de juego durante 3 segundos
+  unsigned long gameOverStart = millis();
+  while (millis() - gameOverStart < 3000) {
+    displayMgr.showTicTacToeGameOver(&ticTacToeGame, coinsEarned);
+    delay(10);
+  }
+  
+  // DESPUÉS de los 3 segundos, activar animación HAPPY si ganó monedas
+  if (coinsEarned > 0) {
+    pet.showHappyFace = true;
+    pet.happyFaceTimer = millis();
+    playSound(1500, 100);
+    delay(100);
+    playSound(1800, 100);
+  }
+  
+  log_i("Tic-Tac-Toe ended. Result: %d, Coins earned: %d", result, coinsEarned);
+}
+

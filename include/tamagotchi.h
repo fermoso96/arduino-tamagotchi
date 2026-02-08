@@ -14,7 +14,8 @@ private:
   int boredom;     // 0-100%
   int sleepiness;  // 0-100%
   int coins;
-  bool memoryGameUnlocked; // Nuevo: indica si el juego de memoria está desbloqueado
+  bool memoryGameUnlocked; // Indica si el juego de memoria está desbloqueado
+  bool ticTacToeUnlocked;  // Indica si el juego de tres en raya está desbloqueado
   
   unsigned long lastMinuteUpdate;
   unsigned long sleepStartTime;
@@ -53,7 +54,9 @@ public:
   // Tienda
   bool buyFood(int type); // 0: manzana, 1: pan, 2: queso, 3: tarta
   bool buyMemoryGame();
+  bool buyTicTacToeGame();
   bool getMemoryGameUnlocked() const { return memoryGameUnlocked; }
+  bool getTicTacToeUnlocked() const { return ticTacToeUnlocked; }
   
   // Getters
   int getHunger() const { return hunger; }

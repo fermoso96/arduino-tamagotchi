@@ -1,6 +1,6 @@
 #include "display.h"
 
-void DisplayManager::showShopMenuScreen(int shopMenuOption, bool memGameUnlocked) {
+void DisplayManager::showShopMenuScreen(int shopMenuOption) {
   display->clearDisplay();
   // Mostrar monedas arriba
   display->setTextSize(1);
@@ -12,20 +12,34 @@ void DisplayManager::showShopMenuScreen(int shopMenuOption, bool memGameUnlocked
   display->drawLine(0, 10, 127, 10, SSD1306_WHITE);
 
   // Artículos de la tienda
-  const char* labels[5] = {"Manzana (10c/+25H)", "Pan (15c/+50H)", "Queso (20c/+75H)", "Tarta (25c/+100H)", "Juego Memoria (100c)"};
-  int totalItems = memGameUnlocked ? 4 : 5;
-  int y = 18;
-  int itemHeight = 10;
-  for (int i = 0; i < totalItems; i++) {
-    if (i == shopMenuOption) {
-      display->fillRect(0, y + (i * itemHeight), 128, itemHeight, SSD1306_WHITE);
+  const char* labels[6] = {"Manzana (10c/+25H)", "Pan (15c/+50H)", "Queso (20c/+75H)", "Tarta (25c/+100H)", "Juego Memoria (100c)", "3 en Raya (100c)"};
+  
+  // Contar items disponibles
+  int totalItems = 4; // Siempre hay 4 comidas
+  if (!pet->getMemoryGameUnlocked()) totalItems++; // +1 si memoria no desbloqueado
+  if (!pet->getTicTacToeUnlocked()) totalItems++; // +1 si tres en raya no desbloqueado
+  
+  int y = 13;
+  int itemHeight = 9;
+  int currentIdx = 0;
+  
+  // Mostrar items
+  for (int i = 0; i < 6; i++) {
+    // Saltar items ya comprados
+    if (i == 4 && pet->getMemoryGameUnlocked()) continue;
+    if (i == 5 && pet->getTicTacToeUnlocked()) continue;
+    
+    if (currentIdx == shopMenuOption) {
+      display->fillRect(0, y + (currentIdx * itemHeight), 128, itemHeight, SSD1306_WHITE);
       display->setTextColor(SSD1306_BLACK);
     } else {
       display->setTextColor(SSD1306_WHITE);
     }
-    display->setCursor(5, y + (i * itemHeight) + 1);
+    display->setCursor(2, y + (currentIdx * itemHeight) + 1);
     display->setTextSize(1);
     display->print(labels[i]);
+    
+    currentIdx++;
   }
   display->display();
 }
@@ -315,9 +329,10 @@ void DisplayManager::showGameMenuScreen(int selectedOption) {
   // Línea divisoria
   display->drawLine(0, 15, 127, 15, SSD1306_WHITE);
   // Opciones
-  int y = 25;
-  int itemHeight = 15;
+  int y = 22;
+  int itemHeight = 14;
   int idx = 0;
+  
   // Siempre mostrar ESQUIVAR
   if (selectedOption == idx) {
     display->fillRect(0, y + (idx * itemHeight), 128, itemHeight, SSD1306_WHITE);
@@ -329,7 +344,8 @@ void DisplayManager::showGameMenuScreen(int selectedOption) {
   display->setTextSize(1);
   display->print("ESQUIVAR");
   idx++;
-  // Solo mostrar MEMORIA si está desbloqueado
+  
+  // Mostrar MEMORIA si está desbloqueado
   if (pet->getMemoryGameUnlocked()) {
     if (selectedOption == idx) {
       display->fillRect(0, y + (idx * itemHeight), 128, itemHeight, SSD1306_WHITE);
@@ -340,7 +356,23 @@ void DisplayManager::showGameMenuScreen(int selectedOption) {
     display->setCursor(20, y + (idx * itemHeight) + 3);
     display->setTextSize(1);
     display->print("MEMORIA");
+    idx++;
   }
+  
+  // Mostrar TRES EN RAYA si está desbloqueado
+  if (pet->getTicTacToeUnlocked()) {
+    if (selectedOption == idx) {
+      display->fillRect(0, y + (idx * itemHeight), 128, itemHeight, SSD1306_WHITE);
+      display->setTextColor(SSD1306_BLACK);
+    } else {
+      display->setTextColor(SSD1306_WHITE);
+    }
+    display->setCursor(20, y + (idx * itemHeight) + 3);
+    display->setTextSize(1);
+    display->print("TRES EN RAYA");
+    idx++;
+  }
+  
   display->display();
 }
 
@@ -446,5 +478,103 @@ void DisplayManager::showEyesNormal() {
   // Ojo derecho
   display->drawCircle(86, 32, 10, SSD1306_WHITE);
   display->fillCircle(86, 32, 4, SSD1306_WHITE);
+  display->display();
+}
+
+void DisplayManager::showTicTacToeScreen(TicTacToeGame* ticTacToe) {
+  display->clearDisplay();
+  
+  // Tamaño de cada celda
+  const int cellSize = 16;
+  const int startX = 36;  // Centro horizontal
+  const int startY = 10;  // Dejar espacio arriba para info
+  
+  // Título: estado del juego
+  display->setTextSize(1);
+  display->setTextColor(SSD1306_WHITE);
+  display->setCursor(0, 0);
+  if (ticTacToe->getState() == TIC_PLAYER_TURN) {
+    display->print("Tu turno");
+  } else if (ticTacToe->getState() == TIC_TAMAGOTCHI_TURN) {
+    display->print("Pet juega...");
+  }
+  
+  // Dibujar la cuadrícula 3x3
+  // Líneas verticales
+  display->drawLine(startX + cellSize, startY, startX + cellSize, startY + cellSize * 3, SSD1306_WHITE);
+  display->drawLine(startX + cellSize * 2, startY, startX + cellSize * 2, startY + cellSize * 3, SSD1306_WHITE);
+  
+  // Líneas horizontales
+  display->drawLine(startX, startY + cellSize, startX + cellSize * 3, startY + cellSize, SSD1306_WHITE);
+  display->drawLine(startX, startY + cellSize * 2, startX + cellSize * 3, startY + cellSize * 2, SSD1306_WHITE);
+  
+  // Dibujar fichas y cursor
+  for (int y = 0; y < 3; y++) {
+    for (int x = 0; x < 3; x++) {
+      int cellContent = ticTacToe->getCellContent(x, y);
+      int centerX = startX + x * cellSize + cellSize / 2;
+      int centerY = startY + y * cellSize + cellSize / 2;
+      
+      if (cellContent == CELL_PLAYER) {
+        // Dibujar X para el jugador
+        int offset = 4;
+        display->drawLine(centerX - offset, centerY - offset, centerX + offset, centerY + offset, SSD1306_WHITE);
+        display->drawLine(centerX + offset, centerY - offset, centerX - offset, centerY + offset, SSD1306_WHITE);
+      } else if (cellContent == CELL_TAMAGOTCHI) {
+        // Dibujar O para el Tamagotchi
+        display->drawCircle(centerX, centerY, 4, SSD1306_WHITE);
+      }
+      
+      // Dibujar cursor (rectángulo alrededor de la celda)
+      if (x == ticTacToe->getCursorX() && y == ticTacToe->getCursorY() && 
+          ticTacToe->getState() == TIC_PLAYER_TURN) {
+        int cellX = startX + x * cellSize;
+        int cellY = startY + y * cellSize;
+        display->drawRect(cellX + 1, cellY + 1, cellSize - 2, cellSize - 2, SSD1306_WHITE);
+      }
+    }
+  }
+  
+  // Mostrar estadísticas en la parte inferior
+  display->setTextSize(1);
+  display->setTextColor(SSD1306_WHITE);
+  display->setCursor(0, 56);
+  display->print("V:");
+  display->print(ticTacToe->getWins());
+  display->print(" E:");
+  display->print(ticTacToe->getDraws());
+  display->print(" D:");
+  display->print(ticTacToe->getLosses());
+  
+  display->display();
+}
+
+void DisplayManager::showTicTacToeGameOver(TicTacToeGame* ticTacToe, int coinsEarned) {
+  display->clearDisplay();
+  
+  display->setTextSize(2);
+  display->setTextColor(SSD1306_WHITE);
+  
+  GameResult result = ticTacToe->getResult();
+  
+  if (result == RESULT_PLAYER_WIN) {
+    display->setCursor(10, 10);
+    display->println("GANASTE!");
+  } else if (result == RESULT_TAMAGOTCHI_WIN) {
+    display->setCursor(10, 10);
+    display->println("PERDISTE");
+  } else if (result == RESULT_DRAW) {
+    display->setCursor(20, 10);
+    display->println("EMPATE");
+  }
+  
+  display->setTextSize(1);
+  display->setCursor(10, 45);
+  display->print("Monedas: ");
+  if (coinsEarned >= 0) {
+    display->print("+");
+  }
+  display->println(coinsEarned);
+  
   display->display();
 }

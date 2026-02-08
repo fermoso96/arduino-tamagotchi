@@ -6,6 +6,7 @@
 #include "tamagotchi.h"
 #include "game.h"
 #include "memorygame.h"
+#include "tictactoe.h"
 #include "eyes.h"
 
 class DisplayManager {
@@ -23,12 +24,14 @@ public:
   void showSleepScreen();
   void showInsufficientCoinsScreen();
   void showMenuScreen(int menuOption, bool soundEnabled);
-  void showShopMenuScreen(int shopMenuOption, bool memGameUnlocked);
+  void showShopMenuScreen(int shopMenuOption);
   void showGameMenuScreen(int gameMenuOption);
   void showGameScreen(DodgeGame* game);
   void showGameOver(DodgeGame* game, int coinsEarned);
   void showMemoryGameScreen(MemoryGame* memGame);
   void showMemoryGameOver(MemoryGame* memGame, int coinsEarned);
+  void showTicTacToeScreen(TicTacToeGame* ticTacToe);
+  void showTicTacToeGameOver(TicTacToeGame* ticTacToe, int coinsEarned);
   
   // Control de ojos para el juego de memoria
   void showEyesBlink();    // Mostrar parpadeo
